@@ -90,6 +90,9 @@ typedef struct {
     ngx_uint_t                     headers_hash_max_size;
     ngx_uint_t                     headers_hash_bucket_size;
 
+    ngx_int_t                      rcvbuf;
+    ngx_int_t                      sndbuf;
+
 #if (NGX_HTTP_SSL)
     ngx_uint_t                     ssl;
     ngx_uint_t                     ssl_protocols;
@@ -605,6 +608,20 @@ static ngx_command_t  ngx_http_proxy_commands[] = {
       offsetof(ngx_http_proxy_loc_conf_t, http_version),
       &ngx_http_proxy_http_version },
 
+    { ngx_string("proxy_socket_rcvbuf"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, rcvbuf),
+      NULL },
+
+    { ngx_string("proxy_socket_sndbuf"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_proxy_loc_conf_t, sndbuf),
+      NULL },
+
 #if (NGX_HTTP_SSL)
 
     { ngx_string("proxy_ssl_session_reuse"),
@@ -880,6 +897,13 @@ ngx_http_proxy_handler(ngx_http_request_t *r)
     }
 
     u->buffering = plcf->upstream.buffering;
+
+    if (plcf->rcvbuf != NGX_CONF_UNSET) {
+        u->peer.rcvbuf = plcf->rcvbuf;
+    }
+    if (plcf->sndbuf != NGX_CONF_UNSET) {
+        u->peer.sndbuf = plcf->sndbuf;
+    }
 
     u->pipe = ngx_pcalloc(r->pool, sizeof(ngx_event_pipe_t));
     if (u->pipe == NULL) {
@@ -2874,6 +2898,9 @@ ngx_http_proxy_create_loc_conf(ngx_conf_t *cf)
     conf->headers_hash_max_size = NGX_CONF_UNSET_UINT;
     conf->headers_hash_bucket_size = NGX_CONF_UNSET_UINT;
 
+    conf->rcvbuf = NGX_CONF_UNSET;
+    conf->sndbuf = NGX_CONF_UNSET;
+
     ngx_str_set(&conf->upstream.module, "proxy");
 
     return conf;
@@ -3263,6 +3290,12 @@ ngx_http_proxy_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_uint_value(conf->headers_hash_bucket_size,
                               prev->headers_hash_bucket_size, 64);
+
+    ngx_conf_merge_value(conf->rcvbuf,
+                         prev->rcvbuf, NGX_CONF_UNSET);
+
+    ngx_conf_merge_value(conf->sndbuf,
+                         prev->sndbuf, NGX_CONF_UNSET);
 
     conf->headers_hash_bucket_size = ngx_align(conf->headers_hash_bucket_size,
                                                ngx_cacheline_size);
